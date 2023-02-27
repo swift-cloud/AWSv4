@@ -142,7 +142,7 @@ public struct RequestSigner: Sendable {
         query += "X-Amz-Algorithm=AWS4-HMAC-SHA256"
         query += "&X-Amz-Credential=\(credentials.accessKeyId)/\(signingData.date)/\(region)/\(service)/aws4_request"
         query += "&X-Amz-Date=\(signingData.datetime)"
-        query += "&X-Amz-Expires=\(floor(expires))"
+        query += "&X-Amz-Expires=\(Int(expires))"
         query += "&X-Amz-SignedHeaders=\(signingData.signedHeaders)"
         if !omitSecurityToken, let sessionToken = credentials.sessionToken {
             query += "&X-Amz-Security-Token=\(sessionToken.uriEncode())"
