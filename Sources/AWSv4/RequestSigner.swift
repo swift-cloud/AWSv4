@@ -29,7 +29,7 @@ public struct RequestSigner: Sendable {
     }
 
     /// Enum for holding request payload
-    public enum BodyData {
+    public enum HTTPBody {
         /// String
         case string(String)
         /// Data
@@ -42,27 +42,28 @@ public struct RequestSigner: Sendable {
         case s3chunked
     }
 
-    /// Process URL before signing
-    ///
-    /// `signURL` and `signHeaders` make assumptions about the URLs they are provided, this function cleans up a URL so it is ready
-    /// to be signed by either of these functions. It sorts the query params and ensures they are properly percent encoded
-    public func processURL(url: URL) -> URL? {
-        guard var urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
-        let urlQueryString = urlComponents.queryItems?
-            .sorted {
-                if $0.name < $1.name { return true }
-                if $0.name > $1.name { return false }
-                guard let value1 = $0.value, let value2 = $1.value else { return false }
-                return value1 < value2
-            }
-            .map { item in item.value.map { "\(item.name)=\($0.uriEncode())" } ?? "\(item.name)=" }
-            .joined(separator: "&")
-        urlComponents.percentEncodedQuery = urlQueryString
-        // S3 requires "+" encoded in the URL
-        if service == "s3" {
-            urlComponents.percentEncodedPath = urlComponents.path.s3PathEncode()
-        }
-        return urlComponents.url
+    /// Generate signed url and headers, for a HTTP request
+    /// - Parameters:
+    ///   - url: Request URL
+    ///   - method: Request HTTP method
+    ///   - headers: Request headers
+    ///   - body: Request body
+    ///   - expires: How long before the signed URL expires
+    ///   - omitSecurityToken: Should we include security token in the query parameters
+    ///   - date: Date that URL is valid from, defaults to now
+    /// - Returns: Request url and headers with added "authorization" header that contains request signature
+    public func signRequest(
+        url: URL,
+        method: HTTPMethod = .get,
+        headers: HTTPHeaders = [:],
+        body: HTTPBody? = nil,
+        expires: TimeInterval = 3600,
+        omitSecurityToken: Bool = false,
+        date: Date = Date()
+    ) -> (url: URL, headers: HTTPHeaders) {
+        let signedURL = signURL(url: url, method: method, headers: headers, body: body, expires: expires, omitSecurityToken: omitSecurityToken, date: date)
+        let signedHeaders = signHeaders(url: url, method: method, headers: headers, body: body, omitSecurityToken: omitSecurityToken, date: date)
+        return (signedURL, signedHeaders)
     }
 
     /// Generate signed headers, for a HTTP request
@@ -78,7 +79,7 @@ public struct RequestSigner: Sendable {
         url: URL,
         method: HTTPMethod = .get,
         headers: HTTPHeaders = [:],
-        body: BodyData? = nil,
+        body: HTTPBody? = nil,
         omitSecurityToken: Bool = false,
         date: Date = Date()
     ) -> HTTPHeaders {
@@ -125,7 +126,7 @@ public struct RequestSigner: Sendable {
         url: URL,
         method: HTTPMethod = .get,
         headers: HTTPHeaders = [:],
-        body: BodyData? = nil,
+        body: HTTPBody? = nil,
         expires: TimeInterval,
         omitSecurityToken: Bool = false,
         date: Date = Date()
@@ -222,7 +223,7 @@ public struct RequestSigner: Sendable {
     ///   - body: Body of chunk
     ///   - signingData: Signing data returned from previous `signChunk` or `startSigningChunk` if this is the first call
     /// - Returns: signing data that includes the signature and other data that is required for signing the next chunk
-    public func signChunk(body: BodyData, signingData: ChunkedSigningData) -> ChunkedSigningData {
+    public func signChunk(body: HTTPBody, signingData: ChunkedSigningData) -> ChunkedSigningData {
         let stringToSign = self.chunkStringToSign(body: body, previousSignature: signingData.signature, datetime: signingData.datetime)
         let signature = Crypto.Auth.code(for: Data(stringToSign.utf8), secret: signingData.signingKey, using: .sha256).toHexString()
         return ChunkedSigningData(signature: signature, datetime: signingData.datetime, signingKey: signingData.signingKey)
@@ -240,7 +241,7 @@ public struct RequestSigner: Sendable {
 
         var date: String { return String(datetime.prefix(8)) }
 
-        init(url: URL, method: HTTPMethod = .get, headers: HTTPHeaders = HTTPHeaders(), body: BodyData? = nil, bodyHash: String? = nil, date: String, signer: RequestSigner) {
+        init(url: URL, method: HTTPMethod = .get, headers: HTTPHeaders = HTTPHeaders(), body: HTTPBody? = nil, bodyHash: String? = nil, date: String, signer: RequestSigner) {
             self.url = url
             self.method = method
             self.datetime = date
@@ -274,6 +275,29 @@ public struct RequestSigner: Sendable {
             self.headersToSign = headersToSign
             self.signedHeaders = signedHeadersArray.sorted().joined(separator: ";")
         }
+    }
+
+    /// Process URL before signing
+    ///
+    /// `signURL` and `signHeaders` make assumptions about the URLs they are provided, this function cleans up a URL so it is ready
+    /// to be signed by either of these functions. It sorts the query params and ensures they are properly percent encoded
+    func processURL(url: URL) -> URL? {
+        guard var urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        let urlQueryString = urlComponents.queryItems?
+            .sorted {
+                if $0.name < $1.name { return true }
+                if $0.name > $1.name { return false }
+                guard let value1 = $0.value, let value2 = $1.value else { return false }
+                return value1 < value2
+            }
+            .map { item in item.value.map { "\(item.name)=\($0.uriEncode())" } ?? "\(item.name)=" }
+            .joined(separator: "&")
+        urlComponents.percentEncodedQuery = urlQueryString
+        // S3 requires "+" encoded in the URL
+        if service == "s3" {
+            urlComponents.percentEncodedPath = urlComponents.path.s3PathEncode()
+        }
+        return urlComponents.url
     }
 
     // Stage 3 Calculating signature as in https://docs.aws.amazon.com/general/latest/gr/sigv4-calculate-signature.html
@@ -326,7 +350,7 @@ public struct RequestSigner: Sendable {
     }
 
     /// chunked upload string to sign
-    func chunkStringToSign(body: BodyData, previousSignature: String, datetime: String) -> String {
+    func chunkStringToSign(body: HTTPBody, previousSignature: String, datetime: String) -> String {
         let date = String(datetime.prefix(8))
         let stringToSign = "AWS4-HMAC-SHA256-PAYLOAD\n" +
         "\(datetime)\n" +
@@ -338,7 +362,7 @@ public struct RequestSigner: Sendable {
     }
 
     /// Create a SHA256 hash of the Requests body
-    static func hashedPayload(_ payload: BodyData?) -> String {
+    static func hashedPayload(_ payload: HTTPBody?) -> String {
         guard let payload = payload else { return hashedEmptyBody }
         let hash: String?
         switch payload {
@@ -386,7 +410,7 @@ public struct RequestSigner: Sendable {
     }
 }
 
-extension String {
+private extension String {
     func queryEncode() -> String {
         return addingPercentEncoding(withAllowedCharacters: String.queryAllowedCharacters) ?? self
     }
@@ -409,7 +433,7 @@ extension String {
     static let queryAllowedCharacters = CharacterSet(charactersIn: "/;+").inverted
 }
 
-public extension URL {
+private extension URL {
     /// return URL path, but do not remove the slash at the end if it exists.
     ///
     /// There doesn't seem to be anyway to do this without parsing the path myself
