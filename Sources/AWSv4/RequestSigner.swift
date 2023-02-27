@@ -35,11 +35,11 @@ public struct RequestSigner: Sendable {
         /// Data
         case data(Data)
         /// SwiftNIO ByteBuffer
-        case byteBuffer([UInt8])
+        case bytes([UInt8])
         /// Don't use body when signing request
-        case unsignedPayload
+        case unsigned
         /// Internally used when S3 streamed payloads
-        case s3chunked
+        case stream
     }
 
     /// Generate signed url and headers, for a HTTP request
@@ -187,7 +187,7 @@ public struct RequestSigner: Sendable {
     ///   - date: date to use for signing
     /// - Returns: Tuple of updated headers and signing data to use in first call to `signChunk`
     public func startSigningChunks(url: URL, method: HTTPMethod = .get, headers: HTTPHeaders = [:], date: Date = Date()) -> (headers: HTTPHeaders, signingData: ChunkedSigningData) {
-        let bodyHash = RequestSigner.hashedPayload(.s3chunked)
+        let bodyHash = RequestSigner.hashedPayload(.stream)
         let dateString = RequestSigner.timestamp(date)
         var headers = headers
         // add date, host, sha256 and if available security token headers
@@ -370,11 +370,11 @@ public struct RequestSigner: Sendable {
             hash = Crypto.sha256(string).toHexString()
         case .data(let data):
             hash = Crypto.sha256(data).toHexString()
-        case .byteBuffer(let byteBuffer):
-            hash = Crypto.sha256(byteBuffer).toHexString()
-        case .unsignedPayload:
+        case .bytes(let bytes):
+            hash = Crypto.sha256(bytes).toHexString()
+        case .unsigned:
             return "UNSIGNED-PAYLOAD"
-        case .s3chunked:
+        case .stream:
             return "STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
         }
         if let hash = hash {
