@@ -28,6 +28,13 @@ public struct RequestSigner: Sendable {
         self.region = region
     }
 
+    /// Initialise the Signer class with AWS access key and secret
+    public init(accessKeyId: String, secretAccessKey: String, sessionToken: String? = nil, service: String, region: String) {
+        self.credentials = .init(accessKeyId: accessKeyId, secretAccessKey: secretAccessKey, sessionToken: sessionToken)
+        self.service = service
+        self.region = region
+    }
+
     /// Enum for holding request payload
     public enum HTTPBody {
         /// String
