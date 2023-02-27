@@ -52,7 +52,7 @@ public struct RequestSigner: Sendable {
     ///   - omitSecurityToken: Should we include security token in the query parameters
     ///   - date: Date that URL is valid from, defaults to now
     /// - Returns: Request url and headers with added "authorization" header that contains request signature
-    public func signRequest(
+    public func signedRequest(
         url: URL,
         method: HTTPMethod = .get,
         headers: HTTPHeaders = [:],
@@ -61,8 +61,8 @@ public struct RequestSigner: Sendable {
         omitSecurityToken: Bool = false,
         date: Date = Date()
     ) -> (url: URL, headers: HTTPHeaders) {
-        let signedURL = signURL(url: url, method: method, headers: headers, body: body, expires: expires, omitSecurityToken: omitSecurityToken, date: date)
-        let signedHeaders = signHeaders(url: url, method: method, headers: headers, body: body, omitSecurityToken: omitSecurityToken, date: date)
+        let signedURL = signedURL(url: url, method: method, headers: headers, body: body, expires: expires, omitSecurityToken: omitSecurityToken, date: date)
+        let signedHeaders = signedHeaders(url: url, method: method, headers: headers, body: body, omitSecurityToken: omitSecurityToken, date: date)
         return (signedURL, signedHeaders)
     }
 
@@ -75,7 +75,7 @@ public struct RequestSigner: Sendable {
     ///   - omitSecurityToken: Should we include security token in the query parameters
     ///   - date: Date that URL is valid from, defaults to now
     /// - Returns: Request headers with added "authorization" header that contains request signature
-    public func signHeaders(
+    public func signedHeaders(
         url: URL,
         method: HTTPMethod = .get,
         headers: HTTPHeaders = [:],
@@ -122,7 +122,7 @@ public struct RequestSigner: Sendable {
     ///   - omitSecurityToken: Should we include security token in the query parameters
     ///   - date: Date that URL is valid from, defaults to now
     /// - Returns: Signed URL
-    public func signURL(
+    public func signedURL(
         url: URL,
         method: HTTPMethod = .get,
         headers: HTTPHeaders = [:],

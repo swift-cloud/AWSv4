@@ -12,8 +12,8 @@ final class AWSv4Tests: XCTestCase {
     func testExample() throws {
         let headers = ["content-type": "application/json"]
         let signer = RequestSigner(credentials: credentials, service: "s3", region: "us-east-1")
-        let signedURL = signer.signURL(url: url, headers: headers, expires: 3600)
-        let signedHeaders = signer.signHeaders(url: url, headers: headers)
+        let signedURL = signer.signedURL(url: url, headers: headers, expires: 3600)
+        let signedHeaders = signer.signedHeaders(url: url, headers: headers)
         print(signedURL)
         print(signedHeaders)
     }
