@@ -368,7 +368,13 @@ public struct RequestSigner: Sendable {
     /// yyyyMMdd'T'HHmmss'Z'
     static func timestamp(_ date: Date) -> String {
         let c = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
-        return "\(c.year!)\(c.month!)\(c.day!)T\(c.hour!)\(c.minute!)\(c.second!)Z"
+        let year = String(format: "%04d", c.year!)
+        let month = String(format: "%02d", c.month!)
+        let day = String(format: "%02d", c.day!)
+        let hour = String(format: "%02d", c.hour!)
+        let minute = String(format: "%02d", c.minute!)
+        let second = String(format: "%02d", c.second!)
+        return "\(year)\(month)\(day)T\(hour)\(minute)\(second)Z"
     }
 
     /// returns port from URL. If port is set to 80 on an http url or 443 on an https url nil is returned
