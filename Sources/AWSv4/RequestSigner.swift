@@ -86,26 +86,15 @@ public struct RequestSigner: Sendable {
         omitSecurityToken: Bool = false,
         date: Date = Date()
     ) -> FetchRequest {
-        let body = HTTPBody.fromRequest(request)
-        let signedURL = signedURL(
-            url: request.url,
-            method: request.method,
-            headers: request.headers,
-            body: body,
-            expires: expires,
-            omitSecurityToken: omitSecurityToken,
-            date: date
-        )
         let signedHeaders = signedHeaders(
             url: request.url,
             method: request.method,
             headers: request.headers,
-            body: body,
+            body: .fromRequest(request),
             omitSecurityToken: omitSecurityToken,
             date: date
         )
         var request = request
-        request.url = signedURL
         request.headers = signedHeaders
         return request
     }
