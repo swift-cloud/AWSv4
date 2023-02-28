@@ -47,6 +47,27 @@ public struct RequestSigner: Sendable {
         case unsigned
         /// Internally used when S3 streamed payloads
         case stream
+
+        public static func fromRequest(_ request: FetchRequest) -> Self? {
+            return fromRequestBody(request.body)
+        }
+
+        public static func fromRequestBody(_ body: FetchRequest.Body?) -> Self? {
+            switch body {
+            case .text(let text):
+                return .string(text)
+            case .bytes(let bytes):
+                return .bytes(bytes)
+            case .data(let data):
+                return .data(data)
+            case .json(let data):
+                return .data(data)
+            case .stream:
+                return .stream
+            case .none:
+                return nil
+            }
+        }
     }
 
     /// Generate signed url and headers, for a HTTP request
@@ -60,17 +81,33 @@ public struct RequestSigner: Sendable {
     ///   - date: Date that URL is valid from, defaults to now
     /// - Returns: Request url and headers with added "authorization" header that contains request signature
     public func signedRequest(
-        url: URL,
-        method: HTTPMethod = .get,
-        headers: HTTPHeaders = [:],
-        body: HTTPBody? = nil,
+        _ request: FetchRequest,
         expires: TimeInterval = 3600,
         omitSecurityToken: Bool = false,
         date: Date = Date()
-    ) -> (url: URL, headers: HTTPHeaders) {
-        let signedURL = signedURL(url: url, method: method, headers: headers, body: body, expires: expires, omitSecurityToken: omitSecurityToken, date: date)
-        let signedHeaders = signedHeaders(url: url, method: method, headers: headers, body: body, omitSecurityToken: omitSecurityToken, date: date)
-        return (signedURL, signedHeaders)
+    ) -> FetchRequest {
+        let body = HTTPBody.fromRequest(request)
+        let signedURL = signedURL(
+            url: request.url,
+            method: request.method,
+            headers: request.headers,
+            body: body,
+            expires: expires,
+            omitSecurityToken: omitSecurityToken,
+            date: date
+        )
+        let signedHeaders = signedHeaders(
+            url: request.url,
+            method: request.method,
+            headers: request.headers,
+            body: body,
+            omitSecurityToken: omitSecurityToken,
+            date: date
+        )
+        var request = request
+        request.url = signedURL
+        request.headers = signedHeaders
+        return request
     }
 
     /// Generate signed headers, for a HTTP request
@@ -134,7 +171,7 @@ public struct RequestSigner: Sendable {
         method: HTTPMethod = .get,
         headers: HTTPHeaders = [:],
         body: HTTPBody? = nil,
-        expires: TimeInterval,
+        expires: TimeInterval = 3600,
         omitSecurityToken: Bool = false,
         date: Date = Date()
     ) -> URL {
