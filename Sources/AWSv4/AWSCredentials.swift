@@ -1,11 +1,11 @@
 //
-//  Credentials.swift
+//  AWSCredentials.swift
 //  
 //
 //  Created by Andrew Barba on 2/27/23.
 //
 
-public struct Credentials: Sendable, Equatable {
+public struct AWSCredentials: Sendable, Equatable {
     public let accessKeyId: String
     public let secretAccessKey: String
     public let sessionToken: String?

@@ -11,9 +11,9 @@
 import Compute
 
 /// Amazon Web Services V4 Signer
-public struct RequestSigner: Sendable {
+public struct AWSRequestSigner: Sendable {
     /// Security credentials for accessing AWS services
-    public let credentials: Credentials
+    public let credentials: AWSCredentials
     /// Service signing name. In general this is the same as the service name
     public let service: String
     /// AWS region you are working in
@@ -22,7 +22,7 @@ public struct RequestSigner: Sendable {
     static let hashedEmptyBody = Crypto.sha256([]).toHexString()
 
     /// Initialise the Signer class with AWS credentials
-    public init(credentials: Credentials, service: String, region: String) {
+    public init(credentials: AWSCredentials, service: String, region: String) {
         self.credentials = credentials
         self.service = service
         self.region = region
@@ -116,8 +116,8 @@ public struct RequestSigner: Sendable {
         omitSecurityToken: Bool = false,
         date: Date = Date()
     ) -> HTTPHeaders {
-        let bodyHash = RequestSigner.hashedPayload(body)
-        let dateString = RequestSigner.timestamp(date)
+        let bodyHash = AWSRequestSigner.hashedPayload(body)
+        let dateString = AWSRequestSigner.timestamp(date)
         var headers = headers
         // add date, host, sha256 and if available security token headers
         headers["host"] = Self.hostname(from: url)
@@ -127,7 +127,7 @@ public struct RequestSigner: Sendable {
             headers["x-amz-security-token"] = sessionToken
         }
         // construct signing data. Do this after adding the headers as it uses data from the headers
-        let signingData = RequestSigner.SigningData(url: url, method: method, headers: headers, body: body, bodyHash: bodyHash, date: dateString, signer: self)
+        let signingData = AWSRequestSigner.SigningData(url: url, method: method, headers: headers, body: body, bodyHash: bodyHash, date: dateString, signer: self)
 
         // construct authorization string
         let authorization = "AWS4-HMAC-SHA256 " +
@@ -167,7 +167,7 @@ public struct RequestSigner: Sendable {
         var headers = headers
         headers["host"] = Self.hostname(from: url)
         // Create signing data
-        var signingData = RequestSigner.SigningData(url: url, method: method, headers: headers, body: body, date: RequestSigner.timestamp(date), signer: self)
+        var signingData = AWSRequestSigner.SigningData(url: url, method: method, headers: headers, body: body, date: AWSRequestSigner.timestamp(date), signer: self)
         // Construct query string. Start with original query strings and append all the signing info.
         var query = url.query ?? ""
         if query.count > 0 {
@@ -220,8 +220,8 @@ public struct RequestSigner: Sendable {
     ///   - date: date to use for signing
     /// - Returns: Tuple of updated headers and signing data to use in first call to `signChunk`
     public func startSigningChunks(url: URL, method: HTTPMethod = .get, headers: HTTPHeaders = [:], date: Date = Date()) -> (headers: HTTPHeaders, signingData: ChunkedSigningData) {
-        let bodyHash = RequestSigner.hashedPayload(.stream)
-        let dateString = RequestSigner.timestamp(date)
+        let bodyHash = AWSRequestSigner.hashedPayload(.stream)
+        let dateString = AWSRequestSigner.timestamp(date)
         var headers = headers
         // add date, host, sha256 and if available security token headers
         headers["host"] = Self.hostname(from: url)
@@ -234,7 +234,7 @@ public struct RequestSigner: Sendable {
         headers["content-length"] = nil
 
         // construct signing data. Do this after adding the headers as it uses data from the headers
-        let signingData = RequestSigner.SigningData(url: url, method: method, headers: headers, bodyHash: bodyHash, date: dateString, signer: self)
+        let signingData = AWSRequestSigner.SigningData(url: url, method: method, headers: headers, bodyHash: bodyHash, date: dateString, signer: self)
         let signingKey = self.signingKey(date: signingData.date)
         let signature = self.signature(signingData: signingData)
         let chunkedSigningData = ChunkedSigningData(signature: signature, datetime: signingData.datetime, signingKey: signingKey)
@@ -274,7 +274,7 @@ public struct RequestSigner: Sendable {
 
         var date: String { return String(datetime.prefix(8)) }
 
-        init(url: URL, method: HTTPMethod = .get, headers: HTTPHeaders = HTTPHeaders(), body: HTTPBody? = nil, bodyHash: String? = nil, date: String, signer: RequestSigner) {
+        init(url: URL, method: HTTPMethod = .get, headers: HTTPHeaders = HTTPHeaders(), body: HTTPBody? = nil, bodyHash: String? = nil, date: String, signer: AWSRequestSigner) {
             self.url = url
             self.method = method
             self.datetime = date
@@ -285,7 +285,7 @@ public struct RequestSigner: Sendable {
             } else if signer.service == "s3" {
                 self.hashedPayload = "UNSIGNED-PAYLOAD"
             } else {
-                self.hashedPayload = RequestSigner.hashedPayload(body)
+                self.hashedPayload = AWSRequestSigner.hashedPayload(body)
             }
 
             let headersNotToSign: Set<String> = [

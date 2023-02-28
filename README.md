@@ -3,7 +3,7 @@
 An AWS V4 request signing library compatible with all Apple Platforms, Swift Cloud and Fastly Compute@Edge.
 
 ```swift
-let signer = RequestSigner(
+let signer = AWSRequestSigner(
     accessKeyId: "abcde",
     secretAccessKey: "12345",
     service: "s3", 
